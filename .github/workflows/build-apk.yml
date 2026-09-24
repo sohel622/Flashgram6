@@ -35,15 +35,15 @@ jobs:
           npx cap init "Flashgram" "com.sohel.flashgram" --web-dir "dist"
           npx cap add android
 
-      # কোনো ইরোর ছাড়া পারমিশন ও ফুলস্ক্রিন বসানোর নিরাপদ স্ক্রিপ্ট
-      - name: Configure Fullscreen & Permissions
+      # কোনো ফাইল না ভেঙে নিরাপদ উপায়ে পারমিশন যুক্ত করা
+      - name: Add Permissions
         run: |
           node -e '
           const fs = require("fs");
-          const manifestPath = "android/app/src/main/AndroidManifest.xml";
-          if (fs.existsSync(manifestPath)) {
-            let manifest = fs.readFileSync(manifestPath, "utf8");
-            const permissions = `
+          const p = "android/app/src/main/AndroidManifest.xml";
+          if (fs.existsSync(p)) {
+            let m = fs.readFileSync(p, "utf8");
+            const perms = `
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               <uses-permission android:name="android.permission.CAMERA" />
@@ -57,11 +57,8 @@ jobs:
               <uses-feature android:name="android.hardware.camera" android:required="false" />
               <uses-feature android:name="android.hardware.microphone" android:required="false" />
             `;
-            manifest = manifest.replace("<application", permissions + "\n    <application");
-            
-            // ফুলস্ক্রিন ও স্ট্যাটাস বার রিমুভ থিম
-            manifest = manifest.replace(/android:theme="[^"]*"/g, "android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\"");
-            fs.writeFileSync(manifestPath, manifest);
+            m = m.replace("<application", perms + "\n    <application");
+            fs.writeFileSync(p, m);
           }
           '
           npx cap sync android
@@ -70,10 +67,10 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
-          name: Flashgram-FullScreen-App
+          name: Flashgram-App
           path: android/app/build/outputs/apk/debug/app-debug.apk
