@@ -18,27 +18,36 @@ jobs:
         with:
           node-version: 20
 
-      # Java 21 সেটআপ (invalid source release: 21 পুরোপুরি বন্ধ করতে)
+      # জাভা ২১ সেটআপ
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      # ডিপেন্ডেন্সি ইনস্টল ও ওয়েব অ্যাপ বিল্ড
+      # অ্যান্ড্রয়েড এসডিকে টুলস সেটআপ
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ওয়েব প্রজেক্ট বিল্ড ও dist ফোল্ডার নিশ্চিতকরণ
       - name: Install Dependencies and Build Web Project
         run: |
           npm install
           npm run build || node build.js
+          mkdir -p dist
+          if [ -z "$(ls -A dist)" ]; then
+            cp -r * dist/ 2>/dev/null || true
+          fi
 
-      # ক্যাপাসিটর অ্যান্ড্রয়েড সেটআপ
+      # ক্যাপাসিটর ফ্রেশ ইনিশিয়ালাইজ
       - name: Setup Capacitor Android Platform
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
+          rm -rf android
           npx cap init "Flashgram" "com.sohel.flashgram" --web-dir "dist"
           npx cap add android
 
-      # ডুপ্লিকেট ছাড়া পারমিশন যুক্ত করা
+      # পারমিশন কনফিগারেশন
       - name: Configure Android Permissions
         run: |
           node -e '
@@ -71,15 +80,16 @@ jobs:
           '
           npx cap sync android
 
-      # জাভা ২১ এবং গ্রেডেল পাথ পুরোপুরি কনফিগার করে APK বিল্ড
+      # গ্রেডেল মেমোরি ফিক্স এবং ক্লিন APK বিল্ড
       - name: Build Android APK File
         run: |
           cd android
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" >> gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew clean assembleDebug --no-daemon --stacktrace
 
       # তৈরি হওয়া APK ফাইল আপলোড
       - name: Upload Finished APK Artifact
