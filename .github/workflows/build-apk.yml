@@ -13,24 +13,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Environment
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # জাভা ২১ সেটআপ
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      # অ্যান্ড্রয়েড এসডিকে টুলস সেটআপ
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      # ওয়েব প্রজেক্ট বিল্ড ও dist ফোল্ডার নিশ্চিতকরণ
-      - name: Install Dependencies and Build Web Project
+      # ওয়েব অ্যাপ বিল্ড
+      - name: Build Web App
         run: |
           npm install
           npm run build || node build.js
@@ -39,8 +34,8 @@ jobs:
             cp -r * dist/ 2>/dev/null || true
           fi
 
-      # ক্যাপাসিটর ফ্রেশ ইনিশিয়ালাইজ
-      - name: Setup Capacitor Android Platform
+      # ক্যাপাসিটর অ্যান্ড্রয়েড প্ল্যাটফর্ম তৈরি
+      - name: Setup Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           rm -rf android
@@ -80,16 +75,16 @@ jobs:
           '
           npx cap sync android
 
-      # গ্রেডেল মেমোরি ফিক্স এবং ক্লিন APK বিল্ড
-      - name: Build Android APK File
+      # সিস্টেমের বিল্ট-ইন অ্যান্ড্রয়েড SDK দিয়ে APK তৈরি
+      - name: Build APK File
         run: |
           cd android
-          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
           echo "org.gradle.java.home=$JAVA_HOME" >> gradle.properties
           chmod +x gradlew
-          ./gradlew clean assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
       # তৈরি হওয়া APK ফাইল আপলোড
       - name: Upload Finished APK Artifact
