@@ -10,43 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js Environment
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ক্যাপাসিটর অ্যান্ড্রয়েডের জন্য প্রয়োজনীয় Java 21
-      - name: Setup Java 21
+      # Java 17 Temurin distribution for stable Android Gradle 8+ builds
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '21'
+          distribution: 'temurin'
+          java-version: '17'
 
-      # অ্যাপ প্যাকেজ ইনস্টল ও বিল্ড
-      - name: Install Dependencies and Build Web App
+      # Install project dependencies and compile web assets
+      - name: Install Dependencies and Build Web Project
         run: |
           npm install
           npm run build || node build.js
 
-      # ক্যাপাসিটর অ্যান্ড্রয়েড কনফিগারেশন
-      - name: Setup Capacitor Android
+      # Initialize Capacitor and add Android platform
+      - name: Setup Capacitor Android Platform
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "Flashgram" "com.sohel.flashgram" --web-dir "dist"
           npx cap add android
 
-      # ডুপ্লিকেট ছাড়া পারমিশন যুক্ত করা
-      - name: Add Android Permissions
+      # Inject required Android permissions without duplicate tags
+      - name: Configure Android Permissions
         run: |
           node -e '
           const fs = require("fs");
-          const p = "android/app/src/main/AndroidManifest.xml";
-          if (fs.existsSync(p)) {
-            let m = fs.readFileSync(p, "utf8");
-            const perms = [
+          const manifestPath = "android/app/src/main/AndroidManifest.xml";
+          if (fs.existsSync(manifestPath)) {
+            let manifest = fs.readFileSync(manifestPath, "utf8");
+            const permissions = [
               "android.permission.ACCESS_NETWORK_STATE",
               "android.permission.CAMERA",
               "android.permission.RECORD_AUDIO",
@@ -57,30 +57,31 @@ jobs:
               "android.permission.READ_MEDIA_VIDEO",
               "android.permission.READ_MEDIA_AUDIO"
             ];
-            let toAdd = "";
-            perms.forEach(perm => {
-              if (!m.includes(perm)) {
-                toAdd += `\n    <uses-permission android:name="${perm}" />`;
+            let permissionTags = "";
+            permissions.forEach(perm => {
+              if (!manifest.includes(perm)) {
+                permissionTags += `\n    <uses-permission android:name="${perm}" />`;
               }
             });
-            toAdd += `\n    <uses-feature android:name="android.hardware.camera" android:required="false" />`;
-            toAdd += `\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />`;
-            
-            m = m.replace("<application", toAdd + "\n    <application");
-            fs.writeFileSync(p, m);
+            permissionTags += `\n    <uses-feature android:name="android.hardware.camera" android:required="false" />`;
+            permissionTags += `\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />`;
+            manifest = manifest.replace("<application", permissionTags + "\n    <application");
+            fs.writeFileSync(manifestPath, manifest);
           }
           '
           npx cap sync android
 
-      # APK ফাইল জেনারেট
-      - name: Build APK File
+      # Configure Gradle JVM properties and compile Debug APK
+      - name: Build Android APK File
         run: |
           cd android
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
-      # তৈরি হওয়া APK আপলোড
-      - name: Upload Finished APK
+      # Upload the compiled APK as a downloadable workflow artifact
+      - name: Upload Finished APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Flashgram-App
