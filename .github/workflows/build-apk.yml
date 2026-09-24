@@ -24,57 +24,54 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # ১. প্রজেক্ট প্যাকেজ ও ওয়েব বিল্ড
       - name: Install Dependencies and Build Web App
         run: |
           npm install
           npm run build || node build.js
 
-      # ২. ক্যাপাসিটর অ্যান্ড্রয়েড ইঞ্জিন সেটআপ
       - name: Setup Capacitor Android
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "Flashgram" "com.sohel.flashgram" --web-dir "dist"
           npx cap add android
 
-      # ৩. ফুলস্ক্রিন ও সব পারমিশন যুক্ত করা
+      # কোনো ইরোর ছাড়া পারমিশন ও ফুলস্ক্রিন বসানোর নিরাপদ স্ক্রিপ্ট
       - name: Configure Fullscreen & Permissions
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          
-          # প্রয়োজনীয় সব পারমিশন
-          PERMISSIONS="
-              <uses-permission android:name=\"android.permission.INTERNET\" />
-              <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />
-              <uses-permission android:name=\"android.permission.CAMERA\" />
-              <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />
-              <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />
-              <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" />
-              <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" />
-              <uses-permission android:name=\"android.permission.READ_MEDIA_AUDIO\" />
-              <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />
-              <uses-feature android:name=\"android.hardware.microphone\" android:required=\"false\" />"
-
-          sed -i "/<manifest/a $PERMISSIONS" $MANIFEST
-
-          # ফুলস্ক্রিন মোড কনফিগারেশন
-          STYLES="android/app/src/main/res/values/styles.xml"
-          if [ -f "$STYLES" ]; then
-            sed -i '/<resources>/a <style name=\"AppTheme.NoActionBarFullScreen\" parent=\"Theme.AppCompat.Light.NoActionBar\"><item name=\"android:windowFullscreen\">true</item><item name=\"android:windowNoTitle\">true</item><item name=\"android:windowActionBar\">false</item><item name=\"android:windowLayoutInDisplayCutoutMode\">shortEdges</item></style>' $STYLES
-          fi
-
+          node -e '
+          const fs = require("fs");
+          const manifestPath = "android/app/src/main/AndroidManifest.xml";
+          if (fs.existsSync(manifestPath)) {
+            let manifest = fs.readFileSync(manifestPath, "utf8");
+            const permissions = `
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+              <uses-feature android:name="android.hardware.microphone" android:required="false" />
+            `;
+            manifest = manifest.replace("<application", permissions + "\n    <application");
+            
+            // ফুলস্ক্রিন ও স্ট্যাটাস বার রিমুভ থিম
+            manifest = manifest.replace(/android:theme="[^"]*"/g, "android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\"");
+            fs.writeFileSync(manifestPath, manifest);
+          }
+          '
           npx cap sync android
 
-      # ৪. APK বিল্ড করা
       - name: Build APK File
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      # ৫. তৈরি হওয়া APK ফাইলটি ডাউনলোডের জন্য আপলোড
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
